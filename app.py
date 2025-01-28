@@ -101,12 +101,14 @@ if true_file and pred_files:
 
             with col_cm:
                 fig, ax = plt.subplots(figsize=(8,6))
-                sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax,
+                sns.heatmap(cm, annot=True, fmt='d', cmap='Greens', ax=ax,
                           xticklabels=np.unique(merged_df['Label_True']),
-                          yticklabels=np.unique(merged_df['Label_True']))
-                plt.title('Confusion Matrix')
-                plt.xlabel('Predicted Labels')
-                plt.ylabel('True Labels')
+                          yticklabels=np.unique(merged_df['Label_True']), annot_kws={"size": 20})
+                plt.title("Confusion Matrix", fontsize=18)
+                plt.xlabel("Predicted Labels", fontsize=18)
+                plt.ylabel("Actual Labels", fontsize=18)
+                plt.xticks(fontsize=18)
+                plt.yticks(fontsize=18)
                 
                 buf = BytesIO()
                 plt.savefig(buf, format='png')
