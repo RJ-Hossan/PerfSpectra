@@ -159,7 +159,7 @@ if true_file and pred_files:
                     )
                     filtered_disc = discrepancies[discrepancies['Label_True'].isin(selected_class)] if selected_class else discrepancies
                     st.dataframe(filtered_disc.style.applymap(
-                        lambda x: "background-color: #ffcccc",
+                        lambda x: "background-color: #2E5A88",
                         subset=['Label_True', 'Label_Pred']
                     ))
 
