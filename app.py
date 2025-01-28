@@ -20,7 +20,7 @@ def generate_pdf_report(report_text):
     pdf.add_page()
     pdf.set_font("Arial", size=12)
     pdf.multi_cell(0, 10, txt=report_text)
-    return pdf.output(dest='S').encode('latin-1')
+    return bytes(pdf.output(dest='S'))
 
 # UI Setup
 st.title("🕵️ AI Model Performance Inspector Pro")
@@ -37,7 +37,9 @@ with st.expander("📤 Step 1: Upload Data", expanded=True):
 if true_file and pred_files:
     # Data Processing
     true_df = pd.read_csv(true_file)
-    
+    true_df.columns = [col.lower().strip() for col in true_df.columns]
+    true_df.rename(columns={'id': 'Id', 'label': 'Label', 'labels': 'Label'}, inplace=True)
+
     if not {'Id', 'Label'}.issubset(true_df.columns):
         st.error("❌ True labels file must contain 'Id' and 'Label' columns")
         st.stop()
@@ -60,7 +62,9 @@ if true_file and pred_files:
     # Process all selected files
     for file_idx in range(num_files):
         pred_df = pd.read_csv(pred_files[file_idx])
-        
+        pred_df.columns = [col.lower().strip() for col in pred_df.columns] 
+        pred_df.rename(columns={'id': 'Id', 'label': 'Label', 'labels': 'Label'}, inplace=True)
+ 
         # Create expandable section for each file
         with st.expander(f"📊 Analysis for: {pred_files[file_idx].name}", expanded=True):
             if not {'Id', 'Label'}.issubset(pred_df.columns):
@@ -141,7 +145,10 @@ if true_file and pred_files:
                         key=f"txt_{file_idx}"
                     )
 
-            with st.expander("🔍 Detailed Mismatch Analysis", expanded=False):
+            
+            # with st.expander("🔍 Detailed Mismatch Analysis", expanded=False):
+            st.markdown("🔍 Detailed Mismatch Analysis")
+            with st.container():
                 col_filter, col_preview = st.columns([2, 3])
                 
                 with col_filter:
