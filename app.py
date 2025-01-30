@@ -126,6 +126,7 @@ if true_file and pred_files:
     true_df.columns = [col.lower().strip() for col in true_df.columns]
     true_df.rename(columns={'id': 'Id', 'label': 'Label', 'labels': 'Label', 'Prediction': 'Label', 'prediction': 'Label', 'Predictions': 'Label', 'predictions': 'Label'}, inplace=True)
 
+
     if not {'Id', 'Label'}.issubset(true_df.columns):
         st.error("❌ True labels file may contain 'Id/id', 'label/Label' or 'Prediction(s)/prediction(s)' columns")
         st.stop()
