@@ -95,6 +95,11 @@ initialize_label_mapping()
 
 st.title("🕵️ AI Model Performance Inspector Pro")
 st.markdown("### Comprehensive model evaluation toolkit with interactive insights")
+st.markdown(
+    "<h5 style='color: red;'>❌ So far, files may contain 'Id/id', 'label/Label' or 'Prediction(s)/prediction(s)' columns.</h5>",
+    unsafe_allow_html=True
+)
+
 
 with st.expander("🏷️ Configure Label Mappings", expanded=True):
     st.markdown("### Define Label Mappings")
@@ -146,7 +151,7 @@ if true_file and pred_files:
     for file_idx in range(num_files):
         pred_df = pd.read_csv(pred_files[file_idx])
         pred_df.columns = [col.lower().strip() for col in pred_df.columns] 
-        pred_df.rename(columns={'id': 'Id', 'label': 'Label', 'labels': 'Label'}, inplace=True)
+        pred_df.rename(columns={'id': 'Id', 'label': 'Label', 'labels': 'Label', 'Prediction': 'Label', 'prediction': 'Label', 'Predictions': 'Label', 'predictions': 'Label'}, inplace=True)
  
         with st.expander(f"📊 Analysis for: {pred_files[file_idx].name}", expanded=True):
             if not {'Id', 'Label'}.issubset(pred_df.columns):
