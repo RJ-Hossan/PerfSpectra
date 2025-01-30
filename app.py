@@ -4,22 +4,81 @@ import numpy as np
 import base64
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, precision_recall_fscore_support
 from fpdf import FPDF
 from io import BytesIO
 
 st.set_page_config(page_title="ML Model Evaluator Pro", layout="wide")
 
-# Helper functions
+def calculate_g_scores(y_true, y_pred):
+    cm = confusion_matrix(y_true, y_pred)
+    n_classes = cm.shape[0]
+    g_scores = {}
+    
+    # Calculate class-wise G-scores
+    for i in range(n_classes):
+        TP = cm[i, i]
+        FP = np.sum(cm[:, i]) - TP
+        FN = np.sum(cm[i, :]) - TP
+        TN = np.sum(cm) - (TP + FP + FN)
+        
+        sensitivity = TP / (TP + FN) if (TP + FN) > 0 else 0
+        specificity = TN / (TN + FP) if (TN + FP) > 0 else 0
+        g_score = np.sqrt(sensitivity * specificity)
+        
+        # Calculate precision
+        precision = TP / (TP + FP) if (TP + FP) > 0 else 0
+        recall = sensitivity  # recall is same as sensitivity
+        
+        # G-score of precision and recall
+        g_score_pr = np.sqrt(precision * recall) if (precision > 0 and recall > 0) else 0
+        
+        g_scores[f"Class {i}"] = {
+            'G-Score (Sens-Spec)': g_score,
+            'G-Score (Prec-Rec)': g_score_pr,
+            'Sensitivity': sensitivity,
+            'Specificity': specificity,
+            'Precision': precision,
+            'Recall': recall
+        }
+    
+    # Calculate overall G-scores
+    overall_g_score = np.exp(np.mean([np.log(metrics['G-Score (Sens-Spec)']) 
+                                    for metrics in g_scores.values() 
+                                    if metrics['G-Score (Sens-Spec)'] > 0]))
+    
+    overall_g_score_pr = np.exp(np.mean([np.log(metrics['G-Score (Prec-Rec)']) 
+                                       for metrics in g_scores.values() 
+                                       if metrics['G-Score (Prec-Rec)'] > 0]))
+    
+    return g_scores, overall_g_score, overall_g_score_pr
+
 def create_download_link(val, filename):
     b64 = base64.b64encode(val)
     return f'<a href="data:application/octet-stream;base64,{b64.decode()}" download="{filename}">Download {filename}</a>'
 
-def generate_pdf_report(report_text):
+def generate_pdf_report(report_text, g_scores, overall_g_score, overall_g_score_pr):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
     pdf.multi_cell(0, 10, txt=report_text)
+    
+    # Add G-Score section
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', size=14)
+    pdf.cell(0, 10, "G-Score Analysis", ln=True)
+    pdf.set_font("Arial", size=12)
+    
+    # Overall G-Scores
+    pdf.cell(0, 10, f"Overall G-Score (Sensitivity-Specificity): {overall_g_score:.4f}", ln=True)
+    pdf.cell(0, 10, f"Overall G-Score (Precision-Recall): {overall_g_score_pr:.4f}", ln=True)
+    
+    # Class-wise G-Scores
+    for class_name, metrics in g_scores.items():
+        pdf.cell(0, 10, f"\n{class_name}:", ln=True)
+        for metric_name, value in metrics.items():
+            pdf.cell(0, 10, f"{metric_name}: {value:.4f}", ln=True)
+    
     return bytes(pdf.output(dest='S'))
 
 # UI Setup
@@ -74,17 +133,23 @@ if true_file and pred_files:
             merged_df = pd.merge(true_df, pred_df, on='Id', suffixes=('_True', '_Pred'), how='left')
             discrepancies = merged_df[merged_df['Label_True'] != merged_df['Label_Pred']]
             
-            # Calculate Metrics with 4 decimal precision
+            # Calculate Metrics
             accuracy = accuracy_score(merged_df['Label_True'], merged_df['Label_Pred'])
             cm = confusion_matrix(merged_df['Label_True'], merged_df['Label_Pred'])
             report_text = classification_report(merged_df['Label_True'], merged_df['Label_Pred'], digits=4)
             report_df = pd.DataFrame(classification_report(
                 merged_df['Label_True'], merged_df['Label_Pred'], output_dict=True, digits=4)).transpose()
+            
+            # Calculate G-Scores
+            g_scores, overall_g_score, overall_g_score_pr = calculate_g_scores(
+                merged_df['Label_True'], merged_df['Label_Pred'])
 
             # Store metrics for comparison
             all_metrics.append({
                 'File': pred_files[file_idx].name,
                 'Accuracy': accuracy,
+                'Overall G-Score (Sens-Spec)': overall_g_score,
+                'Overall G-Score (Prec-Rec)': overall_g_score_pr,
                 'Mismatches': len(discrepancies)
             })
 
@@ -92,7 +157,9 @@ if true_file and pred_files:
             col_metrics, col_cm, col_report = st.columns([1, 2, 3])
             
             with col_metrics:
-                st.metric("Accuracy", f"{accuracy:.4%}")  
+                st.metric("Accuracy", f"{accuracy:.4%}")
+                st.metric("Overall G-Score (Sens-Spec)", f"{overall_g_score:.4f}")
+                st.metric("Overall G-Score (Prec-Rec)", f"{overall_g_score_pr:.4f}")
                 st.metric("Mismatches", len(discrepancies))
                 
                 csv = discrepancies.to_csv(index=False).encode()
@@ -125,12 +192,22 @@ if true_file and pred_files:
                 plt.close()
 
             with col_report:
-                st.dataframe(report_df.style.format("{:.4f}")  # 4 decimal places
+                # Create G-scores DataFrame
+                g_scores_df = pd.DataFrame.from_dict(g_scores, orient='index')
+                
+                # Display classification report
+                st.dataframe(report_df.style.format("{:.4f}")
+                           .background_gradient(cmap='Blues', axis=0))
+                
+                # Display G-scores
+                st.markdown("### G-Score Analysis")
+                st.dataframe(g_scores_df.style.format("{:.4f}")
                            .background_gradient(cmap='Blues', axis=0))
                 
                 col_pdf, col_txt = st.columns(2)
                 with col_pdf:
-                    pdf_report = generate_pdf_report(report_text)
+                    pdf_report = generate_pdf_report(report_text, g_scores, 
+                                                   overall_g_score, overall_g_score_pr)
                     st.download_button(
                         f"📥 PDF Report {file_idx+1}",
                         data=pdf_report,
@@ -139,16 +216,24 @@ if true_file and pred_files:
                         key=f"pdf_{file_idx}"
                     )
                 with col_txt:
+                    # Prepare text report including G-scores
+                    full_report = (f"{report_text}\n\nG-Score Analysis:\n"
+                                 f"Overall G-Score (Sens-Spec): {overall_g_score:.4f}\n"
+                                 f"Overall G-Score (Prec-Rec): {overall_g_score_pr:.4f}\n\n")
+                    for class_name, metrics in g_scores.items():
+                        full_report += f"\n{class_name}:\n"
+                        for metric_name, value in metrics.items():
+                            full_report += f"{metric_name}: {value:.4f}\n"
+                    
                     st.download_button(
                         f"📥 TXT Report {file_idx+1}",
-                        data=report_text,
+                        data=full_report,
                         file_name=f"report_{file_idx+1}.txt",
                         mime="text/plain",
                         key=f"txt_{file_idx}"
                     )
 
-            
-            # with st.expander("🔍 Detailed Mismatch Analysis", expanded=False):
+            # Mismatch Analysis
             st.markdown("🔍 Detailed Mismatch Analysis")
             with st.container():
                 col_filter, col_preview = st.columns([2, 3])
@@ -180,7 +265,12 @@ if true_file and pred_files:
         comparison_df = pd.DataFrame(all_metrics)
         st.dataframe(
             comparison_df.sort_values('Accuracy', ascending=False)
-            .style.format({'Accuracy': "{:.4%}", 'Mismatches': "{:,}"})  # 4 decimal places
+            .style.format({
+                'Accuracy': "{:.4%}",
+                'Overall G-Score (Sens-Spec)': "{:.4f}",
+                'Overall G-Score (Prec-Rec)': "{:.4f}",
+                'Mismatches': "{:,}"
+            })
             .background_gradient(cmap='YlGnBu', subset=['Accuracy'])
         )
 
