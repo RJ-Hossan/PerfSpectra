@@ -20,7 +20,7 @@ This tool is especially useful for **writing shared task papers**, as it automat
 
 1️⃣ Clone the repository:  
 ```bash
-git clone https://github.com/RJ-Hossan/PerfSpectra
+git clone https://github.com/RJ-Hossan/PerfSpectra.git
 cd PerfSpectra
 ```
 
